@@ -1,0 +1,11 @@
+[project]
+name = "blog-geo-spatial-data-in-databricks"
+version = "0.1.0"
+description = "Blog series: working with geo-spatial data in Databricks"
+requires-python = ">=3.11"
+dependencies = [
+    "geopandas>=1.1.4",
+    "matplotlib>=3.9",
+    "pyarrow>=24.0.0",
+    "ruff>=0.9",
+]
