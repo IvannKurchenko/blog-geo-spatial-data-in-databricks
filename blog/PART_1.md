@@ -181,7 +181,7 @@ SELECT st_geohash(st_geomfromwkt('POINT(30.5228081 50.4506574)'), 6) AS geohash
 
 The query returns the value `u8vxn8`, which can be visualized as follows:
 
-![](../blog/images/part_1_0_contains_polygon.png)
+![](images/part_1_0_geo_hash.png)
 
 ## Conclusion
 
