@@ -14,7 +14,12 @@ To keep the overview grounded, let's use [Independence Square in Kyiv, Ukraine](
 
 ### Types: GEOMETRY and GEOGRAPHY
 
-Databricks supports two native spatial types — [`GEOMETRY`](https://docs.databricks.com/aws/en/sql/language-manual/data-types/geometry-type) and [`GEOGRAPHY`](https://docs.databricks.com/aws/en/sql/language-manual/data-types/geography-type) — but these types are not directly serializable. In other words, you cannot write a DataFrame containing `GEOMETRY` or `GEOGRAPHY` columns to a Delta table or any other storage format.
+Databricks supports two native spatial types — [`GEOMETRY`](https://docs.databricks.com/aws/en/sql/language-manual/data-types/geometry-type) and [`GEOGRAPHY`](https://docs.databricks.com/aws/en/sql/language-manual/data-types/geography-type). Although both represent spatial objects, they differ fundamentally in how they model the Earth:
+
+- `GEOMETRY` uses a **planar** (flat-Earth) model. Coordinates are treated as Cartesian (x, y), and calculations ignore Earth's curvature. This makes it faster and well-suited for local or small-area analysis.
+- `GEOGRAPHY` uses a **spherical** model. Coordinates are treated as latitude/longitude on the globe, and calculations account for Earth's curvature. This is slower but gives accurate results for large distances and global datasets.
+
+Neither type can be directly persisted: you cannot write a DataFrame containing `GEOMETRY` or `GEOGRAPHY` columns to a Delta table or any other storage format.
 
 In [the previous post](https://medium.com/p/01cb2ef77992/edit), the "Well Known" markup formats were introduced for exactly this purpose. Let's start there.
 
@@ -102,7 +107,7 @@ SELECT st_distance(
 ) * 111 AS distance
 ```
 
-This gives approximately 723 km. As you might expect, the result is not very accurate due to the nature of the calculation.
+This gives approximately 723 km. As you might expect, the result is not very accurate due to the nature of the calculation. The large discrepancy compared to the sphere-based functions below stems from the fact that `st_distance` treats coordinates as flat Cartesian values — it computes a straight-line Euclidean distance in degrees and then scales it.
 
 A better alternative is `st_distancesphere`, which returns the distance in meters on a sphere using the mean radius of the WGS84 ellipsoid. This function is more restrictive and works only with `GEOMETRY` points:
 
