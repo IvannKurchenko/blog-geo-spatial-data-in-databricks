@@ -1,34 +1,28 @@
-## Geospatial Data in Databricks — Part 1: ST_* functions
+## Geospatial Data in Databricks — Part 1: ST_* Functions
 
 ### Introduction
-The following series of blog posts focuses on working with geospatial data in Databricks.
-In the previous part of the series we outlined theoretical basis's that will be references heavily in this part. 
-In this pos we will get more familiar with [`ST_*` family of functions](https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-st-geospatial-functions-alpha)
 
-A bit of historical context. Spatial functions for SQL first introduced in "ISO 19125-2 (SFA-SQL)" standard in "SQL/MM Spatial" section.
-`ST` prefix original meant Spatial and Temporal. Nowadays, this standard is implemented by various vendors, so don't 
-wonder to see same ST function signature in other SQL implementation.
+The following series of blog posts focuses on working with geospatial data in Databricks. In the [previous part](https://medium.com/@ivan-kurchenko/01cb2ef77992) of the series, we outlined the theoretical foundations that will be referenced heavily here. In this post, we will explore the [`ST_*` family of functions](https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-st-geospatial-functions-alpha).
 
-Overall Databricks provides implementation for around spatial 80 functions. To avoid overwhelming, we will focus on some 
-portion of them split by topic.
+A bit of historical context: spatial functions for SQL were first introduced in the "ISO 19125-2 (SFA-SQL)" standard, specifically in the "SQL/MM Spatial" section. The `ST_` prefix originally stood for Spatial and Temporal. Today, this standard is implemented by various vendors, so you may encounter the same `ST_` function signatures across other SQL implementations.
 
-To keep overview more grounded, lets take as an example location [Independence Square in Kyiv, Ukraine](https://www.openstreetmap.org/?mlat=50.45&mlon=30.524167&zoom=15#map=18/50.450519/30.523340).  
+Databricks provides implementations for around 80 spatial functions in total. To keep things manageable, we will focus on a subset of them, organized by topic.
 
-Note that ST_ functions are supported in Databricks Runtime version 17.1 and higher.
+To keep the overview grounded, let's use [Independence Square in Kyiv, Ukraine](https://www.openstreetmap.org/?mlat=50.45&mlon=30.524167&zoom=15#map=18/50.450519/30.523340) as our running example.
+
+> Note: `ST_*` functions are supported in Databricks Runtime 17.1 and higher.
 
 ### Types: GEOMETRY and GEOGRAPHY
-https://docs.databricks.com/aws/en/sql/language-manual/data-types/geometry-type
-https://docs.databricks.com/aws/en/sql/language-manual/data-types/geography-type
-These types are not serializable per se. In other words you can't write data frame with GEOGRAPHY or GEOMETRY type
-into Delta table or other location.
-In [the previous post](https://medium.com/p/01cb2ef77992/edit) the "Well Known" markup language was introduced for 
-that purpose. So lets start with that.
 
-### Deserialisation
-Prior to any manipulation with geo data in dataframe wee need to be able to read it. So this will be first portion
-of functions to get familiar with - deserializing "Well Known" values into GEOMETRY and GEOGRAPHY types.
-Databricks provides functions that covers a whole combination of source formats (WKT, WKB, EWKT, EWKB) and target
-types (GEOMETRY and GEOGRAPHY).
+Databricks supports two native spatial types — [`GEOMETRY`](https://docs.databricks.com/aws/en/sql/language-manual/data-types/geometry-type) and [`GEOGRAPHY`](https://docs.databricks.com/aws/en/sql/language-manual/data-types/geography-type) — but these types are not directly serializable. In other words, you cannot write a DataFrame containing `GEOMETRY` or `GEOGRAPHY` columns to a Delta table or any other storage format.
+
+In [the previous post](https://medium.com/p/01cb2ef77992/edit), the "Well Known" markup formats were introduced for exactly this purpose. Let's start there.
+
+### Deserialization
+
+Before any manipulation of geospatial data in a DataFrame, we need to be able to read it. This makes deserialization the first group of functions to get familiar with — converting "Well Known" values into `GEOMETRY` and `GEOGRAPHY` types.
+
+Databricks provides functions covering the full combination of source formats (WKT, WKB, EWKT, EWKB) and target types (`GEOMETRY` and `GEOGRAPHY`):
 
 - [`st_geogfromwkt`](https://docs.databricks.com/aws/en/sql/language-manual/functions/st_geogfromwkt)
 - [`st_geogfromwkb`](https://docs.databricks.com/aws/en/sql/language-manual/functions/st_geogfromwkb)
@@ -39,94 +33,104 @@ types (GEOMETRY and GEOGRAPHY).
 - [`st_geomfromwkb`](https://docs.databricks.com/aws/en/sql/language-manual/functions/st_geomfromwkb)
 - [`st_geomfromwkt`](https://docs.databricks.com/aws/en/sql/language-manual/functions/st_geomfromwkt)
 
-For instance to WKT conversion looks following
+For example, converting from WKT looks like this:
+
 ```sql
-select st_geogfromwkt('POLYGON ((30.5235417 50.4499077, 30.5243239 50.4504775, 30.5227595 50.4512945, 30.522253 50.4511905, 30.5220898 50.4508967, 30.5235417 50.4499077))') as polygon
+SELECT st_geogfromwkt('POLYGON ((30.5235417 50.4499077, 30.5243239 50.4504775, 30.5227595 50.4512945, 30.522253 50.4511905, 30.5220898 50.4508967, 30.5235417 50.4499077))') AS polygon
 ```
 
-### Serialisation
-Consequently, To store these types they are needed to be converted in one of "Well Known" formats correspondingly with a help
-of one of these functions:
+### Serialization
+
+To store spatial types back to a persistent format, they must be converted into one of the "Well Known" formats using one of the following functions:
 
 - [`st_asewkb`](https://docs.databricks.com/aws/en/sql/language-manual/functions/st_asewkb)
 - [`st_asewkt`](https://docs.databricks.com/aws/en/sql/language-manual/functions/st_asewkt)
 - [`st_aswkb`](https://docs.databricks.com/aws/en/sql/language-manual/functions/st_aswkb)
 - [`st_aswkt`](https://docs.databricks.com/aws/en/sql/language-manual/functions/st_aswkt)
 
-Taking previous example, we can convert polygon geography back to EWKT string:
-```
-select st_asewkt(st_geogfromwkt('POLYGON ((30.5235417 50.4499077, 30.5243239 50.4504775, 30.5227595 50.4512945, 30.522253 50.4511905, 30.5220898 50.4508967, 30.5235417 50.4499077))')) as polygon_ewkt
-```
-That returns EWKT representation:
-`SRID=4326;POLYGON((30.5235417 50.4499077,30.5243239 50.4504775,30.5227595 50.4512945,30.522253 50.4511905,30.5220898 50.4508967,30.5235417 50.4499077))`
-The only noticeable difference is explicit SRID added at the beginning.
+Building on the previous example, we can convert the polygon geography back to an EWKT string:
 
-### Geo JSON
-GeoJson as it was reviewed in [the previous part](https://medium.com/@ivan-kurchenko/01cb2ef77992) one of the open
-formats for working with spatial data. Its support is provided via the following API:
+```sql
+SELECT st_asewkt(st_geogfromwkt('POLYGON ((30.5235417 50.4499077, 30.5243239 50.4504775, 30.5227595 50.4512945, 30.522253 50.4511905, 30.5220898 50.4508967, 30.5235417 50.4499077))')) AS polygon_ewkt
+```
+
+This returns the EWKT representation:
+
+`SRID=4326;POLYGON((30.5235417 50.4499077,30.5243239 50.4504775,30.5227595 50.4512945,30.522253 50.4511905,30.5220898 50.4508967,30.5235417 50.4499077))`
+
+The only noticeable difference is the explicit SRID prepended at the beginning.
+
+### GeoJSON
+
+GeoJSON, as covered in [the previous part](https://medium.com/@ivan-kurchenko/01cb2ef77992), is one of the open formats for working with spatial data. Its support is provided through the following functions:
 
 - [`st_geogfromgeojson`](https://docs.databricks.com/aws/en/sql/language-manual/functions/st_geogfromgeojson)
 - [`st_geomfromgeojson`](https://docs.databricks.com/aws/en/sql/language-manual/functions/st_geomfromgeojson)
 - [`st_asgeojson`](https://docs.databricks.com/aws/en/sql/language-manual/functions/st_asgeojson)
 
-For example, the following query to conver example polygon to GeoJSON: 
+For example, the following query converts our example polygon to GeoJSON:
+
 ```sql
-select st_asgeojson(st_geogfromwkt('POLYGON ((30.5235417 50.4499077, 30.5243239 50.4504775, 30.5227595 50.4512945, 30.522253 50.4511905, 30.5220898 50.4508967, 30.5235417 50.4499077))'))
+SELECT st_asgeojson(st_geogfromwkt('POLYGON ((30.5235417 50.4499077, 30.5243239 50.4504775, 30.5227595 50.4512945, 30.522253 50.4511905, 30.5220898 50.4508967, 30.5235417 50.4499077))'))
 ```
-that gives the following result:
+
+Which produces:
+
 ```json
 {"type":"Polygon","coordinates":[[[30.5235417,50.4499077],[30.5243239,50.4504775],[30.5227595,50.4512945],[30.522253,50.4511905],[30.5220898,50.4508967],[30.5235417,50.4499077]]]}
 ```
-Pay attention that this value is [`Geometry`](https://datatracker.ietf.org/doc/html/rfc7946#section-3.1) object type from GeoJSON.
-So to construct complete GeoJSON the result needs to be wrapped into [`Feature`](https://datatracker.ietf.org/doc/html/rfc7946#section-3.2) or [`FeatureCollection`](https://datatracker.ietf.org/doc/html/rfc7946#section-3.3).
+
+Note that this value is a [`Geometry`](https://datatracker.ietf.org/doc/html/rfc7946#section-3.1) object in GeoJSON terms. To construct a complete GeoJSON document, the result would need to be wrapped into a [`Feature`](https://datatracker.ietf.org/doc/html/rfc7946#section-3.2) or [`FeatureCollection`](https://datatracker.ietf.org/doc/html/rfc7946#section-3.3).
 
 ### Distance
-After we have spatial types in memory we can proceed to some analytical tasks, such as distance measuring.
-The following set of functions can help with that:
+
+Once we have spatial types in memory, we can move on to analytical tasks such as measuring distances. The following functions support this:
+
 - [`st_distance`](https://docs.databricks.com/aws/en/sql/language-manual/functions/st_distance)
 - [`st_distancesphere`](https://docs.databricks.com/aws/en/sql/language-manual/functions/st_distancesphere)
 - [`st_distancespheroid`](https://docs.databricks.com/aws/en/sql/language-manual/functions/st_distancespheroid)
 - [`st_dwithin`](https://docs.databricks.com/aws/en/sql/language-manual/functions/st_dwithin)
 
-For more specific, example lets consider measuring distance between previously considered independence square and 
-[Market Square in Lviv, Ukraine](https://www.openstreetmap.org/#map=18/49.841913/24.030694).
+For a more concrete example, let's measure the distance between Independence Square in Kyiv and [Market Square in Lviv, Ukraine](https://www.openstreetmap.org/#map=18/49.841913/24.030694).
 
-Let's first consider `st_distance`. Pay attention that this functions works only with `GEOMETRY` type which means
-that surface curvature won't be taken into account. Additionally, the distance is returned in the same unit as geometry
-defined, hence in degrees. So to get approximate distance in kilometers the result needs to be [multiplied after this by 111](https://stackoverflow.com/questions/1253499/simple-calculations-for-working-with-lat-lon-and-km-distance)
+Let's start with `st_distance`. Note that this function works only with the `GEOMETRY` type, which means surface curvature is not taken into account. The distance is returned in the same unit as the geometry is defined — in this case, degrees. To get an approximate distance in kilometers, the result must be [multiplied by 111](https://stackoverflow.com/questions/1253499/simple-calculations-for-working-with-lat-lon-and-km-distance):
+
 ```sql
-select st_distance( 
+SELECT st_distance( 
     st_geomfromwkt('POINT(24.0317835 49.8419343)'),
     st_geomfromwkt('POINT(30.5235417 50.4499077)')
-) * 111 as distance
+) * 111 AS distance
 ```
-Which gives a result of 723 KM. As you might guess this value is not very accurate due to nature of calculation.
 
-Another option is to use `st_distancesphere` that returns distance in meters on the sphere which radius is mean radius of
-WGS84 ellipsoid. This function  is more restrictive and works with only with `GEOMETRY` points.
+This gives approximately 723 km. As you might expect, the result is not very accurate due to the nature of the calculation.
+
+A better alternative is `st_distancesphere`, which returns the distance in meters on a sphere using the mean radius of the WGS84 ellipsoid. This function is more restrictive and works only with `GEOMETRY` points:
+
 ```sql
-select st_distancesphere( 
+SELECT st_distancesphere( 
     st_geomfromwkt('POINT(24.0317835 49.8419343)'),
     st_geomfromwkt('POINT(30.5235417 50.4499077)')
-) / 1000 as distance
+) / 1000 AS distance
 ```
-Which returns 467 kilometers. 
 
-The last one function to review is `st_distancespheroid` that returns geodesic distance on WGS84 ellipsoid.
+This returns 467 kilometers.
+
+The most accurate option is `st_distancespheroid`, which returns the geodesic distance on the WGS84 ellipsoid:
+
 ```sql
-select st_distancespheroid( 
+SELECT st_distancespheroid( 
     st_geomfromwkt('POINT(24.0317835 49.8419343)'),
     st_geomfromwkt('POINT(30.5235417 50.4499077)')
-) / 1000 as distance
+) / 1000 AS distance
 ```
-That results to 468 kilometers.
-Natual question arise "which one to choose when?". The order from least performant and more accurate goes:
-`st_distancespheroid`, `st_distancesphere` and `st_distance`.
+
+This returns 468 kilometers.
+
+A natural question arises: which one should you use? Listed from most accurate (but slowest) to least accurate (but fastest): `st_distancespheroid` → `st_distancesphere` → `st_distance`.
 
 ### Relations
-Another set of operation that we will review is determine relation between spatial objects. 
-It might be useful for various analytical cases, such as [geofencing](https://en.wikipedia.org/wiki/Geofence)
-The following set of functions gives this possibility.
+
+Another important group of operations is determining the spatial relationship between objects. This is useful for various analytical scenarios, such as [geofencing](https://en.wikipedia.org/wiki/Geofence). The following functions support this:
 
 - [`st_touches`](https://docs.databricks.com/aws/en/sql/language-manual/functions/st_touches)
 - [`st_within`](https://docs.databricks.com/aws/en/sql/language-manual/functions/st_within)
@@ -135,57 +139,51 @@ The following set of functions gives this possibility.
 - [`st_contains`](https://docs.databricks.com/aws/en/sql/language-manual/functions/st_contains)
 - [`st_disjoint`](https://docs.databricks.com/aws/en/sql/language-manual/functions/st_disjoint)
 
-All these functions heavily utilise "DE-9IM" model reviewed in [the previous part](https://medium.com/@ivan-kurchenko/01cb2ef77992).
-For instance, we can check whether a single point is inside previously reviewed polygon:
+All of these functions rely heavily on the DE-9IM model introduced in [the previous part](https://medium.com/@ivan-kurchenko/01cb2ef77992). For instance, we can check whether a point falls inside our example polygon:
+
 ```sql
-select st_contains(
+SELECT st_contains(
     st_geomfromwkt('POLYGON((30.5235417 50.4499077, 30.5243239 50.4504775, 30.5227595 50.4512945, 30.522253 50.4511905, 30.5220898 50.4508967, 30.5235417 50.4499077))'),
     st_geomfromwkt('POINT(30.5228081 50.4506574)')
-) as contains
+) AS contains
 ```
-which is true as you can verify from the following map:
-![img.png](../blog/images/part_1_0_contains_polygon.png)
+
+This returns `true`, as you can verify from the map below:
+
+![](../blog/images/part_1_0_contains_polygon.png)
 
 ### Geo Hashing
-[Geo Hash](https://en.wikipedia.org/wiki/Geohash) is part of wider topic of geospatial index, which is out of the scope 
-of current post. By the way, H3 that will be covered in the next part is a part of this topic.
-Working with geospatial data might be slow and cumbersome while solving some problems such as [reverse geocoding](https://en.wikipedia.org/wiki/Reverse_geocoding).
-Imaging working traffic data when we need to understand mileage driven per country. Such dataset will be more
-likely describe location via longitude and latitude value. To convert this location into more human-readable representation
-such as name of country we execute `st_contains` over each region. On large scale, this operation will be too slow, and 
-we would need faster alternative. This is a case when Geo Hash or other spatial indexes shines. 
 
-Geo Hash subdivides entire glob in hierarchical manner in to number of square. Each square has distinct alphanumeric value
-in scope of hierarchy. As a result, each location can be encoded into a string with length up to 12 characters depending
-on precision. 
-Resulting string can be using as key which is way more suitable for operations like `JOIN`.
+[Geohash](https://en.wikipedia.org/wiki/Geohash) is part of a broader topic — geospatial indexing — which is outside the scope of this post. (H3, which will be covered in the next part, is another example of this concept.)
 
-Databricks provides the following set of operations to work with geo hashing:
+Working with geospatial data can be slow and cumbersome for certain problems, such as [reverse geocoding](https://en.wikipedia.org/wiki/Reverse_geocoding). Imagine working with traffic data where you need to calculate mileage driven per country. Such a dataset will most likely represent locations as longitude/latitude pairs. To map these locations to a human-readable representation — like a country name — you would need to run `st_contains` against each region. At scale, this becomes prohibitively slow, and a faster alternative is needed. This is exactly where Geohash and other spatial indexes shine.
+
+Geohash subdivides the entire globe hierarchically into a grid of cells. Each cell has a distinct alphanumeric identifier within the hierarchy. As a result, any location can be encoded as a string of up to 12 characters, depending on the desired precision. That string can then be used as a key, making it far more suitable for operations like `JOIN`.
+
+Databricks provides the following functions for working with Geohash:
+
 - [`st_geohash`](https://docs.databricks.com/gcp/en/sql/language-manual/functions/st_geohash)
 - [`st_geomfromgeohash`](https://docs.databricks.com/aws/en/sql/language-manual/functions/st_geomfromgeohash)
 - [`st_pointfromgeohash`](https://docs.databricks.com/aws/en/sql/language-manual/functions/st_pointfromgeohash)
 
-For instance, to conver 
+For instance, to encode our example point as a Geohash:
 
 ```sql
-select st_geohash(st_geomfromwkt('POINT(30.5228081 50.4506574)'), 6) as geohash
+SELECT st_geohash(st_geomfromwkt('POINT(30.5228081 50.4506574)'), 6) AS geohash
 ```
 
-`st_geohash` receives precision as second argument. You can think of precision as hierarchy level from top to bottom.
-In our example precision of 6 covers area about 1.2 km by 0.6 km.
+`st_geohash` accepts a precision value as its second argument. You can think of precision as the hierarchy level, from coarse to fine. In this example, a precision of 6 covers an area of approximately 1.2 km × 0.6 km.
 
-The query above returns a value 'u8vxn8' which can be visualised as following:
+The query returns the value `u8vxn8`, which can be visualized as follows:
+
 ![](../blog/images/part_1_0_contains_polygon.png)
 
 ## Conclusion
-In this part we covered main functions of `ST_*` family. However, there are operations left out-of-scope like
-geometry manipulaitons via [`st_rotate`](https://docs.databricks.com/aws/en/sql/language-manual/functions/st_rotate) 
-or [`st_scale`](https://docs.databricks.com/aws/en/sql/language-manual/functions/st_scale). In the upcoming part, our 
-focus will shift to [H3](https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-h3-geospatial-functions) functions
-and H3 spacial index as such.
 
+In this part, we covered the main functions of the `ST_*` family. Some operations were intentionally left out of scope, such as geometry manipulation via [`st_rotate`](https://docs.databricks.com/aws/en/sql/language-manual/functions/st_rotate) or [`st_scale`](https://docs.databricks.com/aws/en/sql/language-manual/functions/st_scale). In the upcoming part, our focus will shift to [H3](https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-h3-geospatial-functions) functions and the H3 spatial index.
 
 ## References
+
 - https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-st-geospatial-functions-alpha
 - https://en.wikipedia.org/wiki/Simple_Features#Spatial
 - https://dekart.xyz/blog/st_-prefix-in-sql-a-tale-of-time-space-and-standardization/
