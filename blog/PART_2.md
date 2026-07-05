@@ -7,8 +7,8 @@ This post focuses on the [`H3_*` family of functions](https://docs.databricks.co
 
 A bit of historical and theoretical context. [H3 index](https://h3geo.org) was initially developed at Uber.
 It is a discrete grid that subdivides the globe using [hexagons](https://en.wikipedia.org/wiki/Hexagon) mostly,
-although it has several [pentagons](https://en.wikipedia.org/wiki/Pentagon) at the top level.
-The grid has a hierarchy of 16 levels. At each level, a cell subdivides into 6 cells, each indexed by a number. Hence, the resulting index value can have both numerical and string representations.
+although it has exactly 12 [pentagons](https://en.wikipedia.org/wiki/Pentagon) at each resolution level.
+The grid has a hierarchy of 16 levels. At each level, a cell subdivides into 7 cells, each indexed by a number. Hence, the resulting index value can have both numerical and string representations.
 The cell at the top of the hierarchy (level 0) covers an area of approximately 4.25 million square kilometers, and the smallest cell (level 15) covers an area of about 0.9 square meters.
 
 For more about the H3 index, it is strongly encouraged to visit the corresponding [learning resources](https://h3geo.org/docs/community/tutorials).
@@ -45,6 +45,8 @@ Additionally, there are more narrowly focused functions doing a similar job:
 - [h3_pointash3](https://docs.databricks.com/aws/en/sql/language-manual/functions/h3_pointash3) - convert a `POINT` geometry from WKT, WKB or GeoJSON to an H3 cell ID.
 - [h3_pointash3string](https://docs.databricks.com/aws/en/sql/language-manual/functions/h3_pointash3string) - version for the string hex;
 
+> **TODO:** Add a code example using the Kyiv coordinates (longitude 30.524167, latitude 50.45).
+
 #### Polyfill as H3
 
 [h3_polyfillash3](https://docs.databricks.com/aws/en/sql/language-manual/functions/h3_polyfillash3) and [h3_polyfillash3string](https://docs.databricks.com/aws/en/sql/language-manual/functions/h3_polyfillash3string) return cell IDs as `BIGINT` and `STRING` respectively.
@@ -53,7 +55,7 @@ Unlike `h3_coverash3`, `h3_polyfillash3` returns only cell IDs that lie strictly
 ```sql
 select h3_polyfillash3('POLYGON ((30.5235417 50.4499077, 30.5243239 50.4504775, 30.5227595 50.4512945, 30.522253 50.4511905, 30.5220898 50.4508967, 30.5235417 50.4499077))', 9)
 ```
-Because an H3 cell with precision 9 is roughly 100 square meters, which is larger than the given polygon.
+Because an H3 cell with precision 9 covers roughly 105,000 square meters (~0.1 km²), which is much larger than the given polygon.
 
 But with higher precision of 12:
 ```sql
@@ -121,7 +123,7 @@ So the query:
 ```sql
 select h3_ischildof(617527753363161087, 613024153737363455)
 ```
-returns `true` as well.
+returns `true`.
 
 ### Distancing
 Databricks also provides an API to measure distances on the H3 grid.
@@ -142,19 +144,19 @@ which can be considered the cell radius and used for distance measuring. But thi
 ```sql
 select h3_distance(617527753372073983, 617527753363161087) * 0.200786148 * 2 * 1000 as distance_m
 ```
-where
+where:
 - `0.200786148` - edge length for resolution 9.
 - `2` - multiplies the edge length to get the diameter.
 - `1000` - multiplies to convert kilometers to meters.
 
-returns a distance of 800 meters.
+This returns a distance of 800 meters.
 With the following query, we can get the precise spheroid distance between the centroids of these two cells:
 ```sql
 select st_distancespheroid(st_geomfromwkt(h3_centeraswkt(617527753372073983)), st_geomfromwkt(h3_centeraswkt(617527753363161087))) as distance_m
 ```
 That returns a result of 673 meters.
 
-One of H3's advantages over other indexes like [geo hash](https://medium.com/@ivan-kurchenko/e1e817616442) is [h3_hexring](https://docs.databricks.com/aws/en/sql/language-manual/functions/h3_hexring), which returns neighboring cells by cell ID and distance, including the given cell ID. This can be especially useful for use cases such as geofencing with a certain approximation.
+One of H3's advantages over other indexes like [geo hash](https://medium.com/@ivan-kurchenko/e1e817616442) is [h3_hexring](https://docs.databricks.com/aws/en/sql/language-manual/functions/h3_hexring), which returns neighboring cells at a given grid distance from the input cell. This can be especially useful for use cases such as geofencing with a certain approximation.
 Let's consider the example of cell ID "617527753363161087", which is located almost in the center of Kyiv.
 
 ![](images/part_2_5_hexring_cell.png)
@@ -190,6 +192,8 @@ select h3_tochildren(617527753363161087, 10)
 That will give us the following result: `["622031352990302207","622031352990334975","622031352990367743","622031352990400511","622031352990433279","622031352990466047","622031352990498815"]`
 Visually, it can be represented as follows, including the "617527753363161087" parent cell for visibility:
 
+![part_2_8_to_children.png](images/part_2_8_to_children.png)
+
 Conversely, to get the parent cell, we can use [h3_toparent](https://docs.databricks.com/aws/en/sql/language-manual/functions/h3_toparent).
 
 Using our previous example, the following query:
@@ -215,7 +219,7 @@ That results in 127 cells. The visualization is as follows:
 
 As you can guess, some of them can be "joined" without losing precision. This is where [h3_compact](https://docs.databricks.com/aws/en/sql/language-manual/functions/h3_compact) helps. So the query:
 ```sql
-select h3_compact(h3_kring(617527753363161087, 3))
+select h3_compact(h3_kring(617527753363161087, 6))
 ```
 returns an array of 19 elements that can be drawn as follows:
 
