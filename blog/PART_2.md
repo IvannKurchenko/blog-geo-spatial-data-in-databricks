@@ -45,7 +45,13 @@ Additionally, there are more narrowly focused functions doing a similar job:
 - [h3_pointash3](https://docs.databricks.com/aws/en/sql/language-manual/functions/h3_pointash3) - convert a `POINT` geometry from WKT, WKB or GeoJSON to an H3 cell ID.
 - [h3_pointash3string](https://docs.databricks.com/aws/en/sql/language-manual/functions/h3_pointash3string) - version for the string hex;
 
-> **TODO:** Add a code example using the Kyiv coordinates (longitude 30.524167, latitude 50.45).
+For example the query:
+```sql
+select h3_longlatash3(30.524167, 50.45, 9)
+```
+
+returns cell "604016954579091455" that can visual as:
+![](images/part_2_0_h3_long_lat.png)
 
 #### Polyfill as H3
 
