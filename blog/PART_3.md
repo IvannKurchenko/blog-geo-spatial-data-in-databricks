@@ -1,6 +1,6 @@
 ## Geospatial Data in Databricks — Part 3: Visualisation
 
-### Introduction
+## Introduction
 The following series of blog posts focuses on working with geospatial data in Databricks.
 In the previous two parts of the series, we covered the theoretical basis, `ST_*` and `H3_*` families of functions.
 This post focuses on another aspect of working with the data — visualisation.
@@ -45,8 +45,8 @@ For the sake of brevity, we will focus on the most popular libraries in this spa
 
 ### Geo-pandas and Folium
 [GeoPandas](https://geopandas.org), similarly to the well-known Pandas library, provides the ability to work with in-memory
-dataframes in Apache Arrow format. The notable difference is an additional `geometry` column that
-represents the geographic object associated with the data. [Folium](https://python-visualization.github.io/folium/latest/index.html)
+dataframes with a `geometry` column built on Shapely objects. The notable difference from a regular Pandas DataFrame
+is that geometry column, which represents the geographic object associated with each row. [Folium](https://python-visualization.github.io/folium/latest/index.html)
 is another Python library that allows rendering interactive maps from various sources, including GeoPandas dataframes.
 
 To visualise a Spark dataframe with `GEOMETRY`, we first need to convert it to a `GeoPandas` dataframe and render
@@ -88,6 +88,8 @@ The result should look similar to the following:
 
 ### Kepler.gl
 [Kepler.gl](https://kepler.gl) is another map rendering solution. To render Kyiv's polygon using Kepler, we simply pass it a Pandas dataframe without any additional configuration:
+
+First, make sure you have installed [`keplergl`](https://pypi.org/project/keplergl/).
 
 ```python
 from pyspark.sql import functions as F
@@ -137,24 +139,27 @@ The result is the following interactive map:
 
 ## Visualise Geohash
 [Geohashes](https://en.wikipedia.org/wiki/Geohash) were briefly touched upon [in the previous part](https://medium.com/gitconnected/geospatial-data-in-databricks-part-1-st-functions-e1e817616442).
-As a quick reminder: a geohash is a hierarchical, square-based grid that consists of 18 levels filled using Z-curve order.
+As a quick reminder: a geohash is a hierarchical, square-based grid that consists of 12 precision levels filled using Z-curve order.
 Each geohash cell is defined by an alphanumeric string, such as "u8vxn84u".
 
 At the time of writing, neither Folium nor [Kepler.gl](https://github.com/keplergl/kepler.gl/issues/989) provides
 geohash visualisation capabilities out of the box.
 
+Note that unlike H3 — which provides `h3_coverash3string` to fill a polygon with cells — Databricks has no built-in function for geohash area coverage. The `ST_GeoHash` function computes the geohash of a geometry's representative point, yielding a single cell that encodes the location rather than covering the area.
+
+First, make sure you have installed [`pygeohash`](https://pypi.org/project/pygeohash/).
+
 ```python
 from pyspark.sql import functions as F
 from pygeohash.viz import folium_map
 
-# Select the area of the city of Kyiv into Pandas dataframe with `geohash` column of geohash value.
+# Compute the representative geohash for the Kyiv polygon (bounding box center).
 pdf = (
     spark.table("carto_overture_maps_divisions.carto.division_area")
     .filter((F.col("country") == "UA") & (F.lower(F.col("names.common.en")) == "kyiv"))
     .select(F.expr("st_geohash(st_geomfromwkb(geom))").alias("geohash"))
     .toPandas()
 )
-pdf
 
 # Create and show the map with the geohash
 m = folium_map()
@@ -162,7 +167,7 @@ for geohash in pdf['geohash']:
     m.add_geohash(geohash)
 m
 ```
-This will give you the following visualisation of the Kyiv region expressed as geohashes:
+This will give you the following visualisation of the representative geohash cell for Kyiv's polygon:
 ![part_3_4_geo_hash.png](../blog/images/part_3_4_geo_hash.png)
 
 ## Visualise H3
@@ -176,7 +181,6 @@ making H3 cell index visualisation effortless. All that is required is to provid
 column containing H3 cell IDs.
 
 ```python
-%python
 from pyspark.sql import functions as F
 from keplergl import KeplerGl
 
@@ -204,7 +208,6 @@ Luckily, Databricks provides a number of [export functions](https://docs.databri
 which we can use to convert H3 cells to already familiar formats such as WKT and reuse the tools demonstrated above.
 
 ```python
-%python
 from pyspark.sql import functions as F
 import geopandas
 import folium
@@ -214,7 +217,7 @@ pdf = (
     spark
     .table("carto_overture_maps_divisions.carto.division_area")
     .filter(F.lower(F.col("names.common.en")) == "kyiv")
-    .select(F.explode(F.expr("h3_coverash3string(geom, 8)"))).alias("hex_id")
+    .select(F.explode(F.expr("h3_coverash3string(geom, 8)")).alias("hex_id"))
     .select(F.expr("h3_boundaryaswkt(hex_id)").alias("hex_id_wkt"))
     .toPandas()
 )
