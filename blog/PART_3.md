@@ -1,32 +1,28 @@
-## Geospatial Data in Databricks — Part 2: Visualisation
+## Geospatial Data in Databricks — Part 3: Visualisation
 
 ### Introduction
 The following series of blog posts focuses on working with geospatial data in Databricks.
 In the previous two parts of the series, we covered the theoretical basis, `ST_*` and `H3_*` families of functions.
-This post forces on other aspect working with the data - visualisation.
+This post focuses on another aspect of working with the data — visualisation.
 
-As you already got impression from previous posts, working with geo spacial data differs from regular from other 
-plain tabular types, especially in terms of debugging. For instance, to investigate why a point:
+As you may have already gathered from the previous posts, working with geospatial data differs from other plain tabular data types, especially in terms of debugging. For instance, to investigate why a point:
 ```
 POINT(30.525266 50.449621)
 ```
-lies outside expected polygon:
+lies outside an expected polygon:
 ```
 POLYGON ((30.5235417 50.4499077, 30.5243239 50.4504775, 30.5227595 50.4512945, 30.522253 50.4511905, 30.5220898 50.4508967, 30.5235417 50.4499077))
 ```
-both object should be shown on map to. 
-This is just a one exemple, which can be generalised - geospatial data as any other sort of data requires tools 
-for visualisation for different purposes, starting from low level overview to presenting high level analysis. 
+both objects should be shown on a map.
+This is just one example, which can be generalised — geospatial data, like any other type of data, requires visualisation tools for various purposes, from low-level inspection to high-level analysis.
 This is what we're going to explore today.
-Before we proceed it worth mentioning that there are a lot of excellent online tools for this purpose, however 
-
-That is also available in [Databricks Marketplace](https://docs.overturemaps.org/getting-data/data-mirrors/databricks/) that makes the access way easier because of integrated experience.
+Before we proceed, it is worth mentioning that there are many excellent online tools for this purpose. The Overture Maps dataset used in the examples is also available in [Databricks Marketplace](https://docs.overturemaps.org/getting-data/data-mirrors/databricks/), making access much easier through the integrated experience.
 
 ## Visualise Longitude and Latitude
-Let's start from the simplest case that we can imagine: visualising point described by longitude and latitude.
-Databricks offers [inbuilt notebook experience](https://docs.databricks.com/aws/en/dashboards/manage/visualizations/maps#point-map-options
-that allows you to show such points on the map.
-Lets take for example: 
+Let's start with the simplest case: visualising a point described by longitude and latitude.
+Databricks offers a [built-in notebook experience](https://docs.databricks.com/aws/en/dashboards/manage/visualizations/maps#point-map-options)
+that allows you to show such points on a map.
+Let's take the following example:
 ```sql
 SELECT latitude, longitude
 FROM VALUES
@@ -41,22 +37,22 @@ Then in the notebook visualisation they can be shown as markers:
 ![](../blog/images/part_3_0_long_lat_vis.png)
 
 ## Visualise `GEOMETRY` and `GEOGRAPHY`
-Although with more complicated cases of generic `GEOMETRY` and `GEOGRAPHY` this is more tricky as external tools are required to do a job.
-Visualising geographic objects is pretty well discovered problem and you might find a number of tools that does this
-pretty well. For instance, you can find list of tools for [geo pandas](https://geopandas.org/en/stable/community/ecosystem.html#visualization).
+For more complex cases involving generic `GEOMETRY` and `GEOGRAPHY` types, external tools are required.
+Visualising geographic objects is a well-explored problem, and you can find a number of tools that handle it well.
+For instance, you can find a list of tools for [GeoPandas](https://geopandas.org/en/stable/community/ecosystem.html#visualization).
 
-For the sake of bravity we will keep focus on probably the popular libraries in the area.
+For the sake of brevity, we will focus on the most popular libraries in this space.
 
 ### Geo-pandas and Folium
-[GeoPandas](https://geopandas.org) similarly to famous Pandas library provides possibility to work with in memory 
-dataframes in Apache Arrow format. The notable difference is additional `geometry` column added to a dataframe that
-represents a geo object the data associated with. [Folium](https://python-visualization.github.io/folium/latest/index.html)
-is another python library that allows render interactive maps from various sources including GeoPandas dataframe
+[GeoPandas](https://geopandas.org), similarly to the well-known Pandas library, provides the ability to work with in-memory
+dataframes in Apache Arrow format. The notable difference is an additional `geometry` column that
+represents the geographic object associated with the data. [Folium](https://python-visualization.github.io/folium/latest/index.html)
+is another Python library that allows rendering interactive maps from various sources, including GeoPandas dataframes.
 
-Hence to visualise our Spark dataframe with `GEOMETRY` we need first to convert it to `GeoPandas` dataframe and render
-with folium. For visualization example lets take polygon of Kyiv, Ukraine from [Overture maps divisions areas dataset](https://docs.overturemaps.org/schema/reference/divisions/division_area/)
+To visualise a Spark dataframe with `GEOMETRY`, we first need to convert it to a `GeoPandas` dataframe and render
+it with Folium. For a visualisation example, let's take the polygon of Kyiv, Ukraine, from the [Overture Maps divisions areas dataset](https://docs.overturemaps.org/schema/reference/divisions/division_area/).
 
-Please, first make sure you have installed [`geopandas`](https://pypi.org/project/geopandas/) and [`folium`](https://pypi.org/project/folium/)
+First, make sure you have installed [`geopandas`](https://pypi.org/project/geopandas/) and [`folium`](https://pypi.org/project/folium/).
 
 ```python
 from pyspark.sql import functions as F
@@ -72,27 +68,26 @@ pdf = (
     .toPandas()
 )
 
-# Convert WKT column to Geo Pandas geometry
+# Convert WKT column to GeoPandas geometry
 pdf["area_geometry"] = geopandas.GeoSeries.from_wkt(pdf["area"], crs='EPSG:4326')
 
-# Create Geo Pandas DataFrame out from regular Pandas DataFrame
+# Create a GeoPandas DataFrame from a regular Pandas DataFrame
 gdf = geopandas.GeoDataFrame(pdf, geometry="area_geometry")
 
 # Create folium map
 m = folium.Map(zoom_start=1, tiles="cartodbpositron", width=800, height=400)
 
-# Render GoeoPandas DataFrame on it
+# Render GeoPandas DataFrame on it
 folium.GeoJson(gdf).add_to(m)
 
 m
 ```
 
-So after you you could find map similar to next:
+The result should look similar to the following:
 ![](../blog/images/part_3_1_geopandas_folium.png)
 
 ### Kepler.gl
-[Kepler.gl](https://kepler.gl) is another map solution. To render Kyiv's map using Kepler we just need to given it 
-Pandas dataframe without specifying additional details:
+[Kepler.gl](https://kepler.gl) is another map rendering solution. To render Kyiv's polygon using Kepler, we simply pass it a Pandas dataframe without any additional configuration:
 
 ```python
 from pyspark.sql import functions as F
@@ -116,14 +111,14 @@ map
 That gives us the following map:
 ![part_3_2_kepler.png](../blog/images/part_3_2_kepler.png)
 
-## Visualise Geo JSON
-Similarly, using Kepler.gl it is possible without any additional transformations to visualise GeoJSON right away. 
-Lets take previous example of Kyiv region but reconvert WKB to GeoJSON this time:
+## Visualise GeoJSON
+Similarly, using Kepler.gl it is possible to visualise GeoJSON directly, without any additional transformations.
+Let's take the previous example of the Kyiv region but reconvert WKB to GeoJSON this time:
 ```python
 from pyspark.sql import functions as F
 from keplergl import KeplerGl
 
-# Select the area of the city of Kyiv into Pandas dataframe with `area` column of Geo JSON format.
+# Select the area of the city of Kyiv into Pandas dataframe with `area` column of GeoJSON format.
 pdf = (
     spark
     .table("carto_overture_maps_divisions.carto.division_area")
@@ -137,16 +132,16 @@ map.add_data(pdf)
 map
 ```
 
-So we can get the following interactive map:
+The result is the following interactive map:
 ![](../blog/images/part_3_3_kepler_geo_json.png)
 
-## Visualise geo hash
-[Geo Hashes](https://en.wikipedia.org/wiki/Geohash) was briefly touched [in the previous part](https://medium.com/gitconnected/geospatial-data-in-databricks-part-1-st-functions-e1e817616442).
-For sake of reminder: geo hash is a hierarchical, square based grid  that consists of 18 levels filled using Z-Curve order. 
-The geo hash cell defined by alphanumeric string, such as "u8vxn84u".
+## Visualise Geohash
+[Geohashes](https://en.wikipedia.org/wiki/Geohash) were briefly touched upon [in the previous part](https://medium.com/gitconnected/geospatial-data-in-databricks-part-1-st-functions-e1e817616442).
+As a quick reminder: a geohash is a hierarchical, square-based grid that consists of 18 levels filled using Z-curve order.
+Each geohash cell is defined by an alphanumeric string, such as "u8vxn84u".
 
-At the moment of writing both Folium and [Kepler.gl](https://github.com/keplergl/kepler.gl/issues/989) do not provide
-geo hash visualisation capabilities out of the box. 
+At the time of writing, neither Folium nor [Kepler.gl](https://github.com/keplergl/kepler.gl/issues/989) provides
+geohash visualisation capabilities out of the box.
 
 ```python
 from pyspark.sql import functions as F
@@ -161,24 +156,24 @@ pdf = (
 )
 pdf
 
-# Create and show map with the geo hash 
+# Create and show the map with the geohash
 m = folium_map()
 for geohash in pdf['geohash']:
     m.add_geohash(geohash)
 m
 ```
-Will give you the following visualisation of Kyiv region expressed in geohash:
+This will give you the following visualisation of the Kyiv region expressed as geohashes:
 ![part_3_4_geo_hash.png](../blog/images/part_3_4_geo_hash.png)
 
 ## Visualise H3
-[H3](https://h3geo.org/) indexes where covered in [the previous part of the series](https://medium.com/gitconnected/geospatial-data-in-databricks-part-2-h3-functions-45b07439fb57).
-To refresh our memory on the subject, H3 is geospatial hierachical index that subdivides the globe primarily with hexagons and consists of 16 layers.
-Each hexagon cell can be represented with long number that encodes meta such as precision.  
+[H3](https://h3geo.org/) indexes were covered in [the previous part of the series](https://medium.com/gitconnected/geospatial-data-in-databricks-part-2-h3-functions-45b07439fb57).
+To refresh our memory on the subject, H3 is a geospatial hierarchical index that subdivides the globe primarily into hexagons and consists of 16 resolution levels.
+Each hexagon cell can be represented by a 64-bit integer that encodes metadata such as its resolution.
 
-### Kepler.js
-Kepler provides dedicated [H3 layer](https://github.com/keplergl/kepler.gl/blob/master/docs/user-guides/c-types-of-layers/j-h3.md)
-that makes visualising H3 cell index effortless. All is required to provide pandas dataframe with at least `hex_id`
-column which contains as name stands H3 cell ids.
+### Kepler.gl
+Kepler provides a dedicated [H3 layer](https://github.com/keplergl/kepler.gl/blob/master/docs/user-guides/c-types-of-layers/j-h3.md),
+making H3 cell index visualisation effortless. All that is required is to provide a Pandas dataframe with at least a `hex_id`
+column containing H3 cell IDs.
 
 ```python
 %python
@@ -199,14 +194,14 @@ map = KeplerGl()
 map.add_data(pdf)
 map
 ```
-That gives nice interactive map:
+That gives us a nice interactive map:
 ![](../blog/images/part_3_5_h3_kepler.png)
 
 ### Folium
-Unfortunately, at the moment of writing there is no strait wait to draw H3 cells in folium. Off course, it is always
-possible to make [extra implementation](https://jens-wirelesscar.medium.com/lhexagone-in-hexagons-uber-h3-map-1566bc412172) but lets keep it simple.
-Luckily, Databricks provide a number of [export functions](https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-h3-geospatial-functions#export) for H3 
-which we can use to convert it to already known formats such as WKT and reuse previously seen tools. 
+Unfortunately, at the time of writing there is no straightforward way to draw H3 cells in Folium. Of course, it is always
+possible to use a [custom implementation](https://jens-wirelesscar.medium.com/lhexagone-in-hexagons-uber-h3-map-1566bc412172), but let's keep it simple.
+Luckily, Databricks provides a number of [export functions](https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-h3-geospatial-functions#export) for H3
+which we can use to convert H3 cells to already familiar formats such as WKT and reuse the tools demonstrated above.
 
 ```python
 %python
@@ -224,10 +219,10 @@ pdf = (
     .toPandas()
 )
 
-# Convert WKT column to Geo Pandas geometry
+# Convert WKT column to GeoPandas geometry
 pdf["hex_geometry"] = geopandas.GeoSeries.from_wkt(pdf["hex_id_wkt"], crs='EPSG:4326')
 
-# Create Geo Pandas DataFrame out from regular Pandas DataFrame
+# Create a GeoPandas DataFrame from a regular Pandas DataFrame
 gdf = geopandas.GeoDataFrame(pdf, geometry="hex_geometry")
 
 # Create folium map
@@ -243,9 +238,9 @@ Which gives us the following visualisation with each cell drawn separately:
 
 
 ## Conclusion
-In this part we got a sense how to visualise geo spacial data. This is unlocks a variety of use-cases we can cover,
-starting from low level data troubleshooting to building visual for high level analytics.
-At the next part we will go over topic partially touched here: open source data.
+In this part, we explored how to visualise geospatial data. This unlocks a variety of use cases,
+from low-level data troubleshooting to building visuals for high-level analytics.
+In the next part, we will go over a topic partially touched on here: open-source data.
 
 
 ## References
